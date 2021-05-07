@@ -13,20 +13,23 @@ from logging import Formatter, FileHandler
 from flask_wtf import Form
 from forms import *
 from flask_migrate import Migrate
+from alembic import op
 import sys
-from models import *
+
 #----------------------------------------------------------------------------#
 # App Config.
 #----------------------------------------------------------------------------#
-
+# TODO: connect to a local postgresql database
 app = Flask(__name__)
 moment = Moment(app)
 app.config.from_object('config')
 db = SQLAlchemy(app)
 migrate = Migrate(app,db)
+#----------------------------------------------------------------------------#
+# Models.
+#----------------------------------------------------------------------------#
 
-# TODO: connect to a local postgresql database
-
+from models import *
 
 #----------------------------------------------------------------------------#
 # Filters.
@@ -210,30 +213,26 @@ def create_venue_submission():
  
   
 
-@app.route('/venues/<venue_id>', methods=['DELETE'])
+@app.route('/venues/<venue_id>/delete', methods=['DELETE'])
 def delete_venue(venue_id):
-  # TODO: Complete this endpoint for taking a venue_id, and using
-  # SQLAlchemy ORM to delete a record. Handle cases where the session commit could fail.
+  # To delete venues 
   try:
-  
-    venue = Venue.query.filter_by(id=venue_id).delete()
+    venue = Venue.query.get(venue_id)
+    db.session.delete(venue)
     db.session.commit()
-    flash('Venue {} deleted successfully '.format(venue.name))
+    flash('Venue {} deleted successfully'.format(venue.name))
   except:
     flash('Unable to delete Venue {}'.format(venue.name))
     db.session.rollback()
   finally:
     db.session.close()
-  
-  # BONUS CHALLENGE: Implement a button to delete a Venue on a Venue Page, have it so that
-  # clicking that button delete it from the db then redirect the user to the homepage
   return None
 
 #  Artists
 #  ----------------------------------------------------------------
 @app.route('/artists')
 def artists():
-  # TODO: replace with real data returned from querying the database
+  # list our artists
   artist_data =Artist.query.all()
   data =[]
   for artist in artist_data:
@@ -247,9 +246,8 @@ def artists():
 
 @app.route('/artists/search', methods=['POST'])
 def search_artists():
-  # TODO: implement search on artists with partial string search. Ensure it is case-insensitive.
-  # seach for "A" should return "Guns N Petals", "Matt Quevado", and "The Wild Sax Band".
-  # search for "band" should return "The Wild Sax Band".
+  # searching artists with partial string search and case-insensitive.
+
   term = request.form.get('search_term', '')
   artists= Artist.query.filter(Artist.name.ilike('%'+term+'%'))
   data = []
@@ -271,7 +269,7 @@ def search_artists():
 @app.route('/artists/<int:artist_id>')
 def show_artist(artist_id):
   # shows the artist page with the given artist_id
-  # TODO: replace with real artist data from the artist table, using artist_id
+  
   artist = Artist.query.filter_by(id=artist_id).one()
   data={
     'id': artist.id,
@@ -302,9 +300,10 @@ def edit_artist(artist_id):
 
 @app.route('/artists/<int:artist_id>/edit', methods=['POST'])
 def edit_artist_submission(artist_id):
-  artist = Artist.query.get(artist_id)
+  #edit artist details 
+  artist = db.session.query(Artist).filter_by(id = artist_id).first()
   form = ArtistForm(request.form, meta={'csrf': False})
-  print(form)
+ 
   if form.validate:
       try:
             artist.name = form.name.data
@@ -336,14 +335,15 @@ def edit_artist_submission(artist_id):
 
 @app.route('/venues/<int:venue_id>/edit', methods=['GET'])
 def edit_venue(venue_id):
-  
+  #fetch venue details for editing 
   venue = Venue.query.get(venue_id)
   form = VenueForm(obj=venue)
   return render_template('forms/edit_venue.html', form=form, venue=venue)
 
 @app.route('/venues/<int:venue_id>/edit', methods=['POST'])
 def edit_venue_submission(venue_id):
-  venue = Venue.query.get_or_404(venue_id)
+ #submit edited venue data
+  venue = db.session.query(Venue).filter_by(id = venue_id).first()
   form = VenueForm(request.form)
   
   if form.validate:
@@ -387,8 +387,6 @@ def create_artist_form():
 @app.route('/artists/create', methods=['POST'])
 def create_artist_submission():
   # called upon submitting the new artist listing form
-  # TODO: insert form data as a new Venue record in the db, instead
-  # TODO: modify data to be the data object returned from db insertion
       error =False
       try:
         form = ArtistForm(request.form)
@@ -436,9 +434,7 @@ def create_artist_submission():
 
 @app.route('/shows')
 def shows():
-  # displays list of shows at /shows
-  # TODO: replace with real venues data.
-  #       num_shows should be aggregated based on number of upcoming shows per venue.
+  # displays list of shows 
   data =[]
   shows = Show.query.all()
   for show in shows:
@@ -465,7 +461,7 @@ def create_shows():
 @app.route('/shows/create', methods=['POST'])
 def create_show_submission():
   # called to create new shows in the db, upon submitting new show listing form
-  # TODO: insert form data as a new Show record in the db, instead
+
     error=False
     try:
       show = ShowForm(request.form)
@@ -486,14 +482,12 @@ def create_show_submission():
        flash('Show was successfully listed!')
     else:
        flash('An error occurred. Show could not be listed.')
-  # TODO: on unsuccessful db insert, flash an error instead.
-  # e.g., flash('An error occurred. Show could not be listed.')
-  # see: http://flask.pocoo.org/docs/1.0/patterns/flashing/
+ 
     return render_template('pages/home.html')
 
 # Additional Functions
 def artist_past_shows(id):
-
+#  get the past shows of an artist
   shows =  db.session.query(Artist, Show).join(Show).join(Venue).filter(
                                                                              Show.artist_id == id,
                                                                              Show.venue_id == Venue.id,
@@ -531,6 +525,7 @@ def artist_upcoming_shows(id):
   return upcoming_shows
 
 def venue_past_shows(id):
+  #  get the upcoming shows of a venue
   shows =  db.session.query(Artist, Show).join(Show).join(Venue).filter(
                                                                              Show.venue_id == id,
                                                                              Show.artist_id == Artist.id,
@@ -550,7 +545,7 @@ def venue_past_shows(id):
   
 
 def venue_upcoming_shows(id):
-#  get the upcoming shows of an artist
+#  get the upcoming shows of an venue
   shows =  db.session.query(Artist, Show).join(Show).join(Venue).filter(
                                                                              Show.venue_id == id,
                                                                              Show.artist_id == Artist.id,
