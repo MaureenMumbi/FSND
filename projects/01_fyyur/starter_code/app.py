@@ -343,30 +343,38 @@ def edit_venue(venue_id):
 
 @app.route('/venues/<int:venue_id>/edit', methods=['POST'])
 def edit_venue_submission(venue_id):
-  venue = Venue.query.get(venue_id)
+  venue = Venue.query.get_or_404(venue_id)
   form = VenueForm(request.form)
-  try:
-      venue.name = form.name.data
-      venue.city = form.city.data
-      venue.state = form.state.data
-      venue.phone = form.phone.data
-      venue.address = form.address.data
-      venue.genres = form.genres.data
-      venue.image_link =form.image_link.data
-      venue.facebook_link = form.facebook_link.data
-      venue.website_link = form.website_link.data
-      venue.seeking_talent=form.seeking_talent.data
-      venue.seeking_description = form.seeking_description.data
-      db.session.commit()
-      flash("Venue {} is updated successfully".format(venue.name))
-  except Exception as e:
-      print(f'Error ==> {e}')
-      db.session.rollback()
-      flash("Error updating Venue {}".format(venue.name))
-  finally:
-      db.session.close()
-  return redirect(url_for('show_venue', venue_id=venue_id))
   
+  if form.validate:
+      try:
+          venue.name = form.name.data
+          venue.city = form.city.data
+          venue.state = form.state.data
+          venue.address = form.address.data
+          venue.phone = form.phone.data
+          venue.genres = form.genres.data
+          venue.image_link =form.image_link.data
+          venue.facebook_link = form.facebook_link.data
+          venue.website_link = form.website_link.data
+          venue.seeking_talent=form.seeking_talent.data
+          venue.seeking_description = form.seeking_description.data
+          db.session.commit()
+          flash("Venue {} is updated successfully".format(venue.name))
+      except ValueError as e:
+          if app.debug:
+              print(e)
+          db.session.rollback()
+          flash("Error updating Venue {}".format(venue.name))
+      finally:
+          db.session.close()
+      return redirect(url_for('show_venue', venue_id=venue_id))
+  else:
+        message = []
+        for field, err in form.errors.items():
+          message.append(field + ' ' + '|' .join(err))
+          print(str(message))
+          flash('Errors ' + str(message))
 
 #  Create Artist
 #  ----------------------------------------------------------------
